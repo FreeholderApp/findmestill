@@ -1,0 +1,14 @@
+{
+  "profile": "findmestill-card-v0.1",
+  "evidence": "Reproducible local conformance test over TLS with a disposable test certificate",
+  "command": "npm test",
+  "implementations": ["Python Ed25519 issuer", "Node reference card host", "Python static backup host", "Node Web Crypto verifier"],
+  "verified": [
+    "Discover a Python-issued card over HTTPS",
+    "Resolve the same contact ID to a new primary through a saved backup after stopping the old host",
+    "Verify the same signed alias history at the new primary",
+    "Keep the current pin when a replica is stale",
+    "Reject conflicting signatures, expiry, skipped revisions, substitute roots and malformed documents"
+  ],
+  "fixture": "/fixtures/discovery-v0.1.json"
+}

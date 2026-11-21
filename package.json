@@ -1,0 +1,13 @@
+{
+  "name": "findmestill",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "build": "node build.mjs",
+    "start": "node server.mjs dist",
+    "test": "node --test --test-isolation=none"
+  },
+  "license": "Apache-2.0"
+}

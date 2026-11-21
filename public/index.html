@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="FindMeStill is an open protocol for portable contact addresses and verifiable moves between hosts. Read the discovery draft and try the contact verifier.">
+  <link rel="canonical" href="https://findmestill.com/">
+  <link rel="stylesheet" href="/style.css">
+  <title>FindMeStill — Portable contact addresses</title>
+  <script type="module" src="/app.mjs"></script>
+</head>
+<body>
+  <header class="page site-header">
+    <a class="brand" href="/">FindMeStill</a>
+    <nav aria-label="Project">
+      <a href="/spec/discovery-v0.1.md">Specification</a>
+      <a href="/source.tar.gz">Source</a>
+    </nav>
+  </header>
+  <main class="page">
+    <section class="intro" aria-labelledby="intro-title">
+      <div>
+        <p class="eyebrow">Open protocol · Discovery v0.1 draft</p>
+        <h1 id="intro-title">Save the contact.<br>Keep it when they move.</h1>
+        <p class="summary">A FindMeStill address carries a permanent contact ID. The owner can publish a signed change of address through a backup they already shared with you.</p>
+        <a class="primary-link" href="#verifier">Try the contact verifier</a>
+      </div>
+      <aside class="flow" aria-label="Example of a contact moving">
+        <p class="flow-label">ONE SAVED CONTACT</p>
+        <p class="flow-item"><span>Original address</span><strong>studio.example</strong></p>
+        <p class="flow-step">Signed move published at the saved backup</p>
+        <p class="flow-item active"><span>New address</span><strong>studio-moved.example</strong></p>
+        <p class="flow-caption">Same contact ID and signing key</p>
+      </aside>
+    </section>
+    <section class="workspace" id="verifier" aria-labelledby="verifier-title">
+      <div>
+        <h2 id="verifier-title">Verify a contact</h2>
+        <p>Paste a contact link from an introduction you trust. This verifier saves the signed record in this browser so it can check later moves.</p>
+        <noscript><p>The verifier requires JavaScript. The specification and fixtures are available below.</p></noscript>
+      </div>
+      <div class="panel">
+        <form id="resolve">
+          <label for="contact">Contact link</label>
+          <input id="contact" name="contact" type="url" placeholder="https://example.com/cards/desk.json#fms1-…" maxlength="817" required>
+          <div class="actions">
+            <button type="submit">Verify and save</button>
+            <button class="secondary" id="demo" type="button">Try a sample move</button>
+          </div>
+        </form>
+        <p id="status" role="status" aria-live="polite"></p>
+        <ul id="saved" aria-label="Saved contacts"></ul>
+      </div>
+    </section>
+    <section class="resources" aria-labelledby="resources-title">
+      <div>
+        <h2 id="resources-title">Build with FindMeStill</h2>
+        <p>Implement your own client or serve a card on your own host. The reference code is available under Apache 2.0.</p>
+      </div>
+      <ul>
+        <li><a href="/spec/discovery-v0.1.md">Discovery specification</a></li>
+        <li><a href="/fixtures/discovery-v0.1.json">Signed test vectors</a></li>
+        <li><a href="/interop.json">Compatibility results</a></li>
+        <li><a href="/source.tar.gz">Reference server and client source</a></li>
+      </ul>
+    </section>
+  </main>
+  <footer class="page site-footer">This preview covers signed contact discovery and moves. Private messaging, calls and scheduling are in development.</footer>
+</body>
+</html>

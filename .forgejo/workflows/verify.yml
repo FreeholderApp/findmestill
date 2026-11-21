@@ -1,0 +1,32 @@
+name: FindMeStill CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  conformance:
+    name: Build and discovery conformance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: https://data.forgejo.org/actions/checkout@v6
+      - uses: https://data.forgejo.org/actions/setup-node@v6
+        with:
+          node-version: "24.15.0"
+      - name: Locked dependency install
+        run: npm ci --ignore-scripts
+      - name: Signed vectors and HTTPS interoperability
+        run: npm test
+      - name: Production build
+        env:
+          FINDMESTILL_REVISION: ${{ forgejo.sha }}
+        run: npm run build
+      - name: Exact production output
+        run: |
+          node -e 'const fs=require("node:fs"); const release=JSON.parse(fs.readFileSync("dist/release.json")); if(release.revision !== process.env.EXPECTED_REVISION) process.exit(1)'
+          tar -tzf dist/source.tar.gz > /tmp/findmestill-sources.txt
+          grep -Fx findmestill/public/spec/discovery-v0.1.md /tmp/findmestill-sources.txt
+          grep -Fx findmestill/public/fixtures/discovery-v0.1.json /tmp/findmestill-sources.txt
+        env:
+          EXPECTED_REVISION: ${{ forgejo.sha }}
