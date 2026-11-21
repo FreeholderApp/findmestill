@@ -19,8 +19,12 @@ To reproduce the provider transition, run three isolated Kubo repositories with 
 
 The HTTPS experiment used the Marmot TypeScript encrypted-media-v2 group policy, with an injected local TLS blob host. The IPFS experiment exercised retrieval of that ciphertext. An interoperable locator, client consent and a retention statement for optional IPFS delivery still need implementation.
 
+## NIP-17 direct-message check
+
+A separate local test used nostr-tools 2.26.1 and the NIP-17 direct-message format. Both synthetic peers carried a typed FindMeStill address update in a gift-wrapped message. The authorized recipient applied it once after two distinct wraps of the same message ID, and rejected the same signed card chain when the authenticated Nostr sender was a different actor. The test used the shared draft application fixtures. Independent NIP-17 app compatibility remains open.
+
 ## Qualification remaining
 
-Test the same-account second device and native phones, the browser return journey for a private reply, a delivery receipt with a defined retention deadline and retry behavior, and live PWA–Freeholder messaging after a signed address move. Calling, scheduling, NIP-17 and production IPFS gateways have separate acceptance. A delivery profile has yet to be selected.
+Test the same-account second device and native phones, the browser return journey for a private reply, a delivery receipt with a defined retention deadline and retry behavior, and live PWA–Freeholder messaging after a signed address move. Calling, scheduling and production IPFS gateways have separate acceptance. A delivery profile has yet to be selected.
 
-[SimpleX Chat 7.1.4](https://github.com/simplex-chat/simplex-chat/releases/tag/v7.1.4) · [SimpleX SMP/XFTP 6.5.0](https://github.com/simplex-chat/simplexmq/releases/tag/v6.5.0) · [Marmot TypeScript](https://github.com/marmot-protocol/marmot-ts) · [Kubo 0.43.1](https://github.com/ipfs/kubo/releases/tag/v0.43.1)
+[SimpleX Chat 7.1.4](https://github.com/simplex-chat/simplex-chat/releases/tag/v7.1.4) · [SimpleX SMP/XFTP 6.5.0](https://github.com/simplex-chat/simplexmq/releases/tag/v6.5.0) · [Marmot TypeScript](https://github.com/marmot-protocol/marmot-ts) · [Kubo 0.43.1](https://github.com/ipfs/kubo/releases/tag/v0.43.1) · [NIP-17](https://github.com/nostr-protocol/nips/blob/master/17.md)
