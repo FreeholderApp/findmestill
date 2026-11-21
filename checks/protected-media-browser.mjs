@@ -23,7 +23,7 @@ const speechFile = join(directory, "voice.wav");
 await writeFile(speechFile, wav16(speech));
 const videoFile = join(directory, "video.mp4");
 ffmpeg(["-f", "lavfi", "-i", "color=c=blue:s=160x120:r=8:d=2", "-i", speechFile, "-c:v", "libx264",
-  "-pix_fmt", "yuv420p", "-c:a", "aac", "-movflags", "+faststart", "-t", "2", videoFile]);
+  "-pix_fmt", "yuv420p", "-c:a", "aac", "-t", "2", videoFile]);
 
 const reserve = createServer().listen(0, "127.0.0.1");
 await once(reserve, "listening");

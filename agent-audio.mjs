@@ -50,17 +50,20 @@ export async function normalizeAudio({ mime, content }) {
   checkMedia(mime, content);
   let args;
   let input;
+  let source;
   if (mime === "audio/wav") {
     const { channels, rate, seconds } = wavInfo(content);
     if (seconds > maxSeconds) throw Error("The agent can listen for up to two minutes");
     args = ["-f", "s16le", "-ac", String(channels), "-ar", String(rate)];
     input = content.subarray(44);
+    source = "pipe:0";
   } else {
-    args = ["-f", mime === "video/mp4" ? "mov" : "matroska"];
+    args = ["-read_ahead_limit", "-1", "-f", mime === "video/mp4" ? "mov" : "matroska"];
     input = content;
+    source = "cache:pipe:0";
   }
   const normalized = await isolatedFFmpeg([
-    "-protocol_whitelist", "pipe", ...args, "-i", "pipe:0", "-map", "0:a:0",
+    "-protocol_whitelist", "pipe,cache", ...args, "-i", source, "-map", "0:a:0",
     "-vn", "-sn", "-dn", "-t", String(maxSeconds), "-ac", "1", "-ar", String(targetRate),
     "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1",
   ], input, maxPcm, 15000);
