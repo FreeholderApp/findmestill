@@ -16,7 +16,7 @@ jobs:
           node-version: "24.15.0"
       - name: Locked dependency install
         run: npm ci --ignore-scripts
-      - name: Signed vectors and HTTPS interoperability
+      - name: Protocol, relay and HTTPS tests
         run: npm test
       - name: Production build
         env:
@@ -28,5 +28,9 @@ jobs:
           tar -tzf dist/source.tar.gz > /tmp/findmestill-sources.txt
           grep -Fx findmestill/public/spec/discovery-v0.1.md /tmp/findmestill-sources.txt
           grep -Fx findmestill/public/fixtures/discovery-v0.1.json /tmp/findmestill-sources.txt
+          grep -Fx findmestill/public/spec/protected-media-v1.md /tmp/findmestill-sources.txt
+          grep -Fx findmestill/player/player.mjs /tmp/findmestill-sources.txt
+          test -e dist/media/index.html
+          test ! -e dist/player
         env:
           EXPECTED_REVISION: ${{ forgejo.sha }}
