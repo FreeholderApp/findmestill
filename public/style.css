@@ -61,3 +61,10 @@ button:disabled { opacity: .6; cursor: wait; }
   .page { width: calc(100% - 1.5rem); }
   .site-header, .site-header nav { gap: .6rem; }
 }
+
+[hidden] { display: none !important; }
+#connection { color: var(--accent); margin-bottom: .75rem; }
+.install { margin-top: .75rem; }
+.file-label { position: relative; padding: .65rem .95rem; margin: 0; color: var(--accent); border: 1px solid var(--line); border-radius: .4rem; }
+.file-label:focus-within { outline: 3px solid #acddff; outline-offset: 4px; }
+.file-label input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
