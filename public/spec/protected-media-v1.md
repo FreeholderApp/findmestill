@@ -32,4 +32,31 @@ The pilot relay lives under `/v1/media-relay/<mailbox>`. A relay operator issues
 
 The receiver can leave while the relay retains ciphertext. The reference relay uses a bounded SQLite store, a default 24-hour receipt window, and explicit application-origin CORS. It receives ciphertext, mailbox timing, byte sizes and access tokens. The encryption secret is kept at the paired endpoints. The browser stores pairing secrets in origin-private IndexedDB and queues only encrypted outgoing message bodies. Browser-profile compromise or clearing site data affects those local keys. The admission-gated relay is a single-instance pilot. A production deployment needs shared storage and proper operational provisioning.
 
+### Same-origin gateway and resumable reads
+
+The app may relay the existing paths through its own origin. It only forwards
+to one operator-configured origin, which must match the relay origin in the
+pairing code. Never derive an upstream destination from a request or invite.
+Forward the scoped bearer, media request headers and encrypted envelope. Never
+forward application cookies, an `Origin` header, or redirects. Both browser
+endpoints can use their own app origin with the same relay and pairing code.
+The dedicated player still receives the selected bytes over its MessagePort.
+
+An authenticated message GET may return `Accept-Ranges: bytes` and a strong
+`ETag` equal to the receipt digest enclosed in quotes. A client can send a
+single `Range: bytes=<start>-<end>` plus `If-Match` with that ETag. An accepting
+relay returns `206` with the same ETag and `Content-Range: bytes <start>-<end>/<total>`.
+Bounds are inclusive and refer to the exact encrypted envelope. A mismatched
+ETag returns `412`. An unsupported or unsatisfiable range returns `416` with
+`Content-Range: bytes */<total>`. A legacy full `200` remains usable after
+validating the full receipt digest. See [HTTP Range Requests](https://www.rfc-editor.org/rfc/rfc9110.html#name-range-requests).
+
+The reference client requests 256 KiB at a time and keeps only complete
+ciphertext ranges as checkpoints. It binds them to the relay, local pair role,
+message ID and receipt digest, and retains them until completion or expiry.
+Local checkpoints are capped at 64 MiB per app origin. A resumed client must
+check every returned offset and total and verify the assembled SHA-256 and
+authenticated encryption before revealing metadata or sending bytes to the
+player. Partial payloads never reach a decoder or an agent.
+
 [Web Crypto](https://www.w3.org/TR/webcrypto-2/) · [HKDF, RFC 5869](https://www.rfc-editor.org/rfc/rfc5869) · [HTML sandbox](https://html.spec.whatwg.org/multipage/iframe-embed-object.html#attr-iframe-sandbox)

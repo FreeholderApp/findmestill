@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -134,4 +135,84 @@ test("dedicated player serves only its kit, pins its parent and denies network a
   assert.equal((await fetch(origin + "/v1/media-relay/private")).status, 404);
   assert.equal((await fetch(origin, { headers: { "Sec-Fetch-Dest": "iframe", "Sec-Fetch-Site": "same-site" } })).status, 403);
   assert.equal((await fetch(origin + "/player.mjs")).headers.get("Access-Control-Allow-Origin"), "*");
+});
+
+test("gateway resumes authenticated ciphertext ranges, retains no cookies and refuses redirects", async t => {
+  const admission = b64(crypto.getRandomValues(new Uint8Array(32)));
+  const relay = createMediaRelay({ database: ":memory:", admission });
+  const ranges = [];
+  let drop = true;
+  let redirect = false;
+  let corrupt = false;
+  let legacy = false;
+  let reachedRedirect = false;
+  const start = async server => {
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    return `http://127.0.0.1:${server.address().port}`;
+  };
+  const upstream = createServer((req, res) => {
+    if (req.url === "/outside") { reachedRedirect = true; return res.writeHead(200).end(); }
+    assert.equal(req.headers.origin, undefined);
+    assert.equal(req.headers.cookie, undefined);
+    res.setHeader("Set-Cookie", "discard=yes");
+    if (redirect) return res.writeHead(302, { Location: "/outside" }).end();
+    if (req.headers.range) {
+      ranges.push(req.headers.range);
+      if (drop && ranges.length === 2) return res.writeHead(503).end();
+      if (corrupt) return res.writeHead(206, { ETag: '"wrong"', "Content-Range": "bytes 0-5/6" }).end("wrong!");
+      if (legacy) delete req.headers.range;
+    }
+    return relay.request(req, res);
+  });
+  const upstreamOrigin = await start(upstream);
+  const gateway = createSite("public", undefined, { relayUpstream: upstreamOrigin });
+  t.after(() => { gateway.close(); upstream.close(); relay.close(); });
+  const origin = await start(gateway);
+  const a = createPair(upstreamOrigin);
+  const b = readPair(invitation(a));
+  const { outgoing } = await derivePair(a);
+  const { incoming } = await derivePair(b);
+  await setupPair({ ...a, origin }, admission);
+  const long = wav16(new Uint8Array(600000));
+  const item = await seal(outgoing, { ...media, content: long });
+  const header = await sendWire({ ...a, origin }, outgoing, item);
+  const path = `/v1/media-relay/${incoming.mailbox}/messages/${header.id}`;
+  const bearer = `Bearer ${incoming.read}`;
+  const first = await fetch(origin + path, { headers: { Authorization: bearer, Cookie: "app=yes", Origin: origin } });
+  assert.equal(first.headers.get("Set-Cookie"), null);
+  assert.equal(first.headers.get("Access-Control-Allow-Origin"), null);
+  assert.equal(first.headers.get("ETag"), `"${header.digest}"`);
+  assert.deepEqual(new Uint8Array(await first.arrayBuffer()), item.wire);
+  assert.equal((await fetch(origin + path + "?target=/outside", { headers: { Authorization: bearer } })).status, 404);
+  assert.equal((await fetch(origin + path, { headers: { Authorization: bearer, "If-Match": '"wrong"' } })).status, 412);
+  drop = false;
+  const badRange = await fetch(origin + path, { headers: { Authorization: bearer, Range: "bytes=999999-1000000" } });
+  assert.equal(badRange.status, 416);
+  assert.equal(badRange.headers.get("Content-Range"), `bytes */${item.wire.length}`);
+  ranges.length = 0;
+  drop = true;
+  const parts = new Map();
+  const checkpoints = { load: async () => [...parts.values()], save: async part => parts.set(part.offset, part), clear: async () => parts.clear() };
+  await assert.rejects(readMedia({ ...b, origin }, incoming, header, { checkpoints }), /503/);
+  assert.deepEqual([...parts.keys()], [0]);
+  const { content: received } = await readMedia({ ...b, origin }, incoming, header, { checkpoints });
+  assert.deepEqual(received, long);
+  assert.deepEqual(ranges, ["bytes=0-262143", "bytes=262144-524287", "bytes=262144-524287", `bytes=524288-${item.wire.length - 1}`]);
+  assert.equal(parts.size, 0);
+  const damaged = item.wire.slice(0, 262144);
+  damaged[damaged.length - 1] ^= 1;
+  parts.set(0, { offset: 0, chunk: damaged, total: item.wire.length });
+  await assert.rejects(readMedia({ ...b, origin }, incoming, header, { checkpoints }), /unexpected ciphertext/);
+  assert.equal(parts.size, 0);
+  legacy = true;
+  parts.set(0, { offset: 0, chunk: damaged, total: item.wire.length });
+  assert.deepEqual((await readMedia({ ...b, origin }, incoming, header, { checkpoints })).content, long);
+  assert.equal(parts.size, 0);
+  legacy = false;
+  corrupt = true;
+  await assert.rejects(readMedia({ ...b, origin }, incoming, header, { checkpoints }), /mismatched ciphertext range/);
+  redirect = true;
+  assert.equal((await fetch(origin + path, { headers: { Authorization: bearer } })).status, 502);
+  assert.equal(reachedRedirect, false);
 });

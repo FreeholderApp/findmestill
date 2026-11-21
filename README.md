@@ -72,6 +72,19 @@ logs and share it only through a trusted channel. Send text, an uploaded media
 file, or a recorded voice note. On the other device select **Open message** and
 **Open protected player**. The browser player asks for your playback click.
 
+For two separately hosted clients using one relay, start the relay with
+`FMS_RELAY_DATABASE` and `FMS_RELAY_ADMISSION`. On each client server, set
+`FMS_RELAY_UPSTREAM` to that same exact relay origin and keep each client's own
+`FMS_PLAYER_ORIGIN`. The app forwards only media relay requests to its configured
+upstream. A browser downloads from its own app origin, so relay CORS is unnecessary
+in this mode. Pairing codes still name the relay, and both participants can keep
+their own copy. The dedicated player gets the selected clip over a private
+message channel.
+
+Open a message again after pausing, losing a connection, or reloading the app.
+The browser resumes from completed encrypted blocks in private local storage.
+It verifies and decrypts the whole clip before making playback available.
+
 To authorize an agent, create a separate **Listening agent** pair. Provision it
 using standard input. The `pair` subcommand reads through EOF. From an
 interactive terminal paste the code and send EOF without saving it to shell history.
@@ -95,3 +108,5 @@ Run the browser witness against a local Chrome and Playwright installation with
 by a separate checkout. The witness generates synthetic media with FFmpeg and
 exercises two browser profiles, sandboxed playback and a separately paired
 offline listening agent.
+Run `node checks/resumable-media-browser.mjs` after the build to exercise two
+separate app origins, a relay with CORS disabled, and two interrupted downloads.

@@ -58,6 +58,10 @@
       <h2 id="inbox-title">Incoming messages</h2>
       <button id="refresh" type="button">Check inbox</button>
       <ul id="inbox"></ul>
+      <div id="download" hidden>
+        <progress id="download-progress" aria-label="Encrypted download"></progress>
+        <button id="pause-download" type="button">Pause download</button>
+      </div>
       <section id="opened" hidden>
         <button id="close-message" type="button">Close message</button>
         <p id="plain-text"></p>

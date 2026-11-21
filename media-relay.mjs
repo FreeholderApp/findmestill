@@ -2,28 +2,31 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createHash, timingSafeEqual } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
-import { maxWireBytes, relayOrigin, unb64, wireId } from "./public/media/pair.mjs";
+import { maxWireBytes, relayOrigin, wireId } from "./public/media/pair.mjs";
+import { boundedBody, json, prefix, relayHeaders, RequestError, route, token, valid } from "./media-relay-http.mjs";
 
-const prefix = "/v1/media-relay/";
-const pathRule = /^\/v1\/media-relay\/([A-Za-z0-9_-]{22})(?:\/messages(?:\/([A-Za-z0-9_-]{22}))?)?$/;
 const digest = input => createHash("sha256").update(input).digest("base64url");
 const equal = (a, b) => typeof a === "string" && typeof b === "string"
   && a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
-const valid = (s, length) => { try { return !!unb64(s, length); } catch { return false; } };
-const json = (res, status, value) => res.writeHead(status, { "Content-Type": "application/json" }).end(JSON.stringify(value));
-class RequestError extends Error {
-  constructor(status) { super(); this.status = status; }
-}
-async function body(req, limit) {
-  if (Number(req.headers["content-length"]) > limit) throw new RequestError(413);
-  const chunks = [];
-  let length = 0;
-  for await (const chunk of req.iterator({ destroyOnReturn: false })) {
-    length += chunk.length;
-    if (length > limit) throw new RequestError(413);
-    chunks.push(chunk);
+const body = (req, limit) => boundedBody(req.iterator({ destroyOnReturn: false }), limit, req.headers["content-length"]);
+
+function replyWire(req, res, { wire, digest }) {
+  const etag = `"${digest}"`;
+  const match = req.headers["if-match"];
+  if (match && match !== "*" && !match.split(",").some(tag => tag.trim() === etag)) throw new RequestError(412);
+  const headers = { "Content-Type": "application/octet-stream", "Accept-Ranges": "bytes", ETag: etag };
+  const range = req.headers.range;
+  if (!range || (req.headers["if-range"] && req.headers["if-range"] !== etag)) {
+    return res.writeHead(200, { ...headers, "Content-Length": wire.length }).end(wire);
   }
-  return Buffer.concat(chunks, length);
+  const bounds = /^bytes=(\d{0,15})-(\d{0,15})$/i.exec(range);
+  const start = bounds?.[1] ? Number(bounds[1]) : Math.max(0, wire.length - Number(bounds?.[2]));
+  const end = bounds?.[1] && bounds[2] ? Math.min(Number(bounds[2]), wire.length - 1) : wire.length - 1;
+  if (!bounds || !Number.isSafeInteger(start) || start > end) {
+    res.setHeader("Content-Range", `bytes */${wire.length}`);
+    throw new RequestError(416);
+  }
+  return res.writeHead(206, { ...headers, "Content-Range": `bytes ${start}-${end}/${wire.length}`, "Content-Length": end - start + 1 }).end(wire.subarray(start, end + 1));
 }
 
 export function createMediaRelay({ database, admission, corsOrigins = [], retentionMs = 86400000, now = Date.now }) {
@@ -68,26 +71,22 @@ export function createMediaRelay({ database, admission, corsOrigins = [], retent
   }
 
   async function handle(req, res) {
-    res.setHeader("Cache-Control", "no-store");
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Referrer-Policy", "no-referrer");
+    relayHeaders(res);
     const origin = req.headers.origin;
     if (typeof origin === "string") {
       if (!allowOrigins.has(origin)) throw new RequestError(403);
       res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Expose-Headers", "ETag,Content-Range,Accept-Ranges");
       res.setHeader("Vary", "Origin");
     }
-    const match = pathRule.exec(req.url);
-    if (!match || !valid(match[1], 16) || (match[2] && !valid(match[2], 16))) throw new RequestError(404);
+    const { mailbox, id, setup } = route(req.url);
     if (req.method === "OPTIONS") {
-      return res.writeHead(204, { "Access-Control-Allow-Methods": "GET,PUT,OPTIONS", "Access-Control-Allow-Headers": "Authorization,Content-Type" }).end();
+      return res.writeHead(204, { "Access-Control-Allow-Methods": "GET,PUT,OPTIONS", "Access-Control-Allow-Headers": "Authorization,Content-Type,Range,If-Match,If-Range" }).end();
     }
-    const [, mailbox, id] = match;
-    const token = /^Bearer ([A-Za-z0-9_-]{43})$/.exec(req.headers.authorization ?? "")?.[1];
-    if (!valid(token, 32)) throw new RequestError(401);
-    const tokenHash = digest(token);
-    const isSetup = req.url === prefix + mailbox;
-    if (isSetup && req.method === "PUT") {
+    const accessToken = token(req.headers.authorization);
+    if (!valid(accessToken, 32)) throw new RequestError(401);
+    const tokenHash = digest(accessToken);
+    if (setup && req.method === "PUT") {
       if (!equal(admitted, tokenHash)) throw new RequestError(403);
       let keys;
       try { keys = JSON.parse((await body(req, 256)).toString("utf8")); }
@@ -105,7 +104,7 @@ export function createMediaRelay({ database, admission, corsOrigins = [], retent
       });
       return res.writeHead(204).end();
     }
-    if (isSetup) throw new RequestError(405);
+    if (setup) throw new RequestError(405);
     const access = getMailbox.get(mailbox);
     if (!access) throw new RequestError(404);
     if (req.method === "GET") {
@@ -113,7 +112,7 @@ export function createMediaRelay({ database, admission, corsOrigins = [], retent
       if (!id) return json(res, 200, { messages: list.all(mailbox, now()) });
       const record = get.get(mailbox, id, now());
       if (!record) throw new RequestError(404);
-      return res.writeHead(200, { "Content-Type": "application/octet-stream", "Content-Length": record.wire.length }).end(record.wire);
+      return replyWire(req, res, record);
     }
     if (req.method !== "PUT" || !id) throw new RequestError(405);
     if (!equal(access.writer, tokenHash)) throw new RequestError(403);

@@ -1,13 +1,14 @@
 // Copyright (C) 2026 Tony Aly
 // SPDX-License-Identifier: Apache-2.0
 const database = new Promise((resolve, reject) => {
-  const request = indexedDB.open("findmestill-private-media-v1", 2);
+  const request = indexedDB.open("findmestill-private-media-v1", 3);
   request.onupgradeneeded = ({ oldVersion }) => {
     if (oldVersion === 0) {
       request.result.createObjectStore("pairs", { keyPath: "id" });
       request.result.createObjectStore("outbox", { keyPath: "key" });
     }
-    request.transaction.objectStore("outbox").createIndex("pair", "pair");
+    if (oldVersion < 2) request.transaction.objectStore("outbox").createIndex("pair", "pair");
+    request.result.createObjectStore("downloadChunks", { keyPath: ["key", "offset"] }).createIndex("expiry", "expiresAt");
   };
   request.onsuccess = () => {
     request.result.onversionchange = () => request.result.close();
@@ -24,6 +25,44 @@ export async function access(store, operation, mode = "readonly") {
     tx.oncomplete = () => resolve(request.result);
     tx.onabort = () => reject(tx.error ?? Error("Private storage operation failed"));
   });
+}
+
+export function downloadCheckpoints(pair, header) {
+  const key = `${pair.origin}/${pair.id}/${pair.role}/${header.id}/${header.digest}`;
+  const range = IDBKeyRange.bound([key, 0], [key, Number.MAX_SAFE_INTEGER]);
+  return {
+    async load() {
+      await reapDownloads();
+      return await access("downloadChunks", store => store.getAll(range)).catch(() => []);
+    },
+    async save(part) {
+      if (header.expiresAt <= Date.now()) return;
+      const db = await database;
+      await new Promise(resolve => {
+        const tx = db.transaction("downloadChunks", "readwrite");
+        const store = tx.objectStore("downloadChunks");
+        const count = store.count();
+        count.onsuccess = () => {
+          // At most 64 MiB of encrypted range checkpoints per app origin.
+          if (count.result < 256) store.put({ ...part, key, expiresAt: header.expiresAt });
+        };
+        tx.oncomplete = tx.onabort = resolve;
+      }).catch(() => {});
+    },
+    clear: () => access("downloadChunks", store => store.delete(range), "readwrite").catch(() => {}),
+  };
+}
+
+export async function reapDownloads() {
+  try {
+    const db = await database;
+    await new Promise(resolve => {
+      const tx = db.transaction("downloadChunks", "readwrite");
+      const cursor = tx.objectStore("downloadChunks").index("expiry").openCursor(IDBKeyRange.upperBound(Date.now()));
+      cursor.onsuccess = () => { if (cursor.result) { cursor.result.delete(); cursor.result.continue(); } };
+      tx.oncomplete = tx.onabort = resolve;
+    });
+  } catch { /* A storage error does not prevent an online download. */ }
 }
 
 export async function enqueue(pair, item, key = pair.id + "/" + item.id) {

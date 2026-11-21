@@ -4,7 +4,7 @@ import { b64, createPair, derivePair, invitation, readPair, seal } from "./pair.
 import { maxMediaBytes } from "./format.mjs";
 import { attachPlayer } from "./player-host.mjs";
 import { inbox, readMedia, sendWire, setupPair } from "./relay-client.mjs";
-import { access, enqueue } from "./storage.mjs";
+import { access, downloadCheckpoints, enqueue, reapDownloads } from "./storage.mjs";
 import { recordVoice } from "./recorder.mjs";
 
 const element = id => document.getElementById(id);
@@ -23,6 +23,13 @@ let recording;
 const config = fetch("/media/config.json", { cache: "no-store", credentials: "omit" })
   .then(response => response.ok ? response.json() : {}).catch(() => ({}));
 
+async function transport(record) {
+  const { relayUpstream } = await config;
+  if (!relayUpstream) return record;
+  if (record.origin !== relayUpstream) throw Error("This app is configured for a different relay");
+  return { ...record, origin: location.origin };
+}
+
 function closed() {
   messageEpoch++;
   messageAbort?.abort();
@@ -31,6 +38,7 @@ function closed() {
   opened = undefined;
   disposePlayer?.();
   disposePlayer = undefined;
+  element("download").hidden = true;
   element("opened").hidden = true;
   element("plain-text").textContent = "";
 }
@@ -76,13 +84,13 @@ element("pair").addEventListener("submit", event => {
     const purpose = element("purpose").value;
     if (!label) throw Error("Enter a conversation name");
     if (button.value === "create") {
-      record = createPair(location.origin);
+      record = createPair((await config).relayUpstream ?? location.origin);
       const admission = element("admission").value.trim();
       element("admission").value = "";
-      await setupPair(record, admission);
+      await setupPair(await transport(record), admission);
     } else {
       record = readPair(element("invite").value);
-      await inbox(record, (await derivePair(record)).incoming);
+      await inbox(await transport(record), (await derivePair(record)).incoming);
       element("invite").value = "";
     }
     const existing = await access("pairs", store => store.get(record.id));
@@ -107,7 +115,7 @@ element("conversation").onchange = () => select(element("conversation").value).c
 
 async function transmit(target, item) {
   if (item.done) return;
-  await sendWire(target, (await derivePair(target)).outgoing, item);
+  await sendWire(await transport(target), (await derivePair(target)).outgoing, item);
   if (item.key.startsWith("forward/")) {
     await access("outbox", store => store.put({ key: item.key, pair: item.pair, done: true }), "readwrite");
   } else {
@@ -239,8 +247,35 @@ function messageRow(header, incoming, selected, epoch, sequence) {
   button.onclick = () => act(button, async () => {
     closed();
     const currentMessage = messageEpoch;
-    messageAbort = new AbortController();
-    const message = await readMedia(selected, incoming, header, { signal: messageAbort.signal });
+    const controller = new AbortController();
+    messageAbort = controller;
+    element("download-progress").removeAttribute("value");
+    element("download").hidden = false;
+    let message;
+    try {
+      message = await readMedia(await transport(selected), incoming, header, {
+        signal: controller.signal, checkpoints: downloadCheckpoints(selected, header),
+        progress: (received, total) => {
+          if (currentMessage !== messageEpoch) return;
+          const progress = element("download-progress");
+          progress.max = total;
+          progress.value = received;
+        },
+      });
+    } catch (error) {
+      if (currentMessage !== messageEpoch) return;
+      if (controller.signal.aborted) { status("Download paused. Open the message again to resume."); return; }
+      if (error instanceof TypeError || error.name === "TimeoutError") {
+        status("Connection interrupted. Open the message again to resume.");
+        return;
+      }
+      throw error;
+    } finally {
+      if (currentMessage === messageEpoch) {
+        messageAbort = undefined;
+        element("download").hidden = true;
+      }
+    }
     if (epoch !== viewEpoch || currentMessage !== messageEpoch) { message.content.fill(0); return; }
     opened = { selected, header, message };
     element("plain-text").textContent = message.text ?? message.name;
@@ -260,7 +295,8 @@ async function refresh() {
   const epoch = viewEpoch;
   try {
     const { incoming } = await derivePair(selected);
-    const headers = await inbox(selected, incoming);
+    const route = await transport(selected);
+    const headers = await inbox(route, incoming);
     if (epoch !== viewEpoch) return;
     element("inbox").replaceChildren(...headers.map((header, index) => messageRow(header, incoming, selected, epoch, index + 1)));
     if (!headers.length) status("Inbox is empty");
@@ -270,7 +306,7 @@ async function refresh() {
         if (header.storedAt < selected.automaticFrom) continue;
         const key = `forward/${selected.agent}/${selected.id}/${header.id}`;
         if ((await access("outbox", store => store.get(key)))?.done) continue;
-        const message = await readMedia(selected, incoming, header);
+        const message = await readMedia(route, incoming, header);
         try { if (message.mime !== "text/plain") await forwardClip(selected, header, message, selected.automaticFrom); }
         finally { message.content.fill(0); }
       }
@@ -281,6 +317,7 @@ async function refresh() {
   }
 }
 element("refresh").onclick = () => act(element("refresh"), refresh);
+element("pause-download").onclick = () => messageAbort?.abort();
 element("close-message").onclick = closed;
 element("open-player").onclick = () => act(element("open-player"), async () => {
   const chosen = opened;
@@ -301,6 +338,14 @@ element("forward").onclick = () => act(element("forward"), async () => {
 const timer = setInterval(() => {
   if (pair && navigator.onLine && !document.hidden) refresh().catch(error => status(error.message));
 }, 15000);
-window.addEventListener("pagehide", () => { clearInterval(timer); recorder?.stop(); clearRecording(); closed(); }, { once: true });
+const expiryTimer = setInterval(reapDownloads, 60000);
+window.addEventListener("pagehide", () => {
+  clearInterval(timer);
+  clearInterval(expiryTimer);
+  recorder?.stop();
+  clearRecording();
+  closed();
+}, { once: true });
+await reapDownloads();
 for (const record of await access("pairs", store => store.getAll())) pairs.set(record.id, record);
 await select(pairs.keys().next().value).catch(error => status(error.message));
