@@ -8,11 +8,15 @@ import { pathToFileURL } from "node:url";
 const files = new Set([
   "/index.html", "/style.css", "/app.mjs", "/discovery.mjs", "/release.json",
   "/spec/discovery-v0.1.md", "/fixtures/discovery-v0.1.json", "/source.tar.gz", "/LICENSE",
-  "/robots.txt", "/sitemap.xml", "/interop.json",
+  "/robots.txt", "/sitemap.xml", "/interop.json", "/sw.js", "/manifest.webmanifest",
+  "/icons/findmestill-192.png", "/icons/findmestill-512.png",
 ]);
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".png": "image/png",
+  ".webmanifest": "application/manifest+json",
   ".mjs": "text/javascript; charset=utf-8",
   ".json": "application/json",
   ".md": "text/plain; charset=utf-8",
@@ -27,7 +31,7 @@ export function createSite(root, tls) {
     const isCard = /^\/(?:cards|contact)\/[A-Za-z0-9_~.-]+\.json$/.test(pathname);
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Referrer-Policy", "no-referrer");
-    response.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self' https:; base-uri 'none'; frame-ancestors 'none'; form-action 'none'");
+    response.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; worker-src 'self'; manifest-src 'self'; connect-src 'self' https:; base-uri 'none'; frame-ancestors 'none'; form-action 'none'");
     response.setHeader("Cache-Control", "no-store");
     if (request.method !== "HEAD" && request.method !== "GET") {
       response.writeHead(405, { Allow: "GET, HEAD" }).end();
