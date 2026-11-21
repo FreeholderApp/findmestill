@@ -4,12 +4,16 @@ import { createServer as createHttpsServer } from "node:https";
 import { readFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { relayOrigin } from "./public/media/pair.mjs";
 
 const files = new Set([
   "/index.html", "/style.css", "/app.mjs", "/discovery.mjs", "/release.json",
   "/spec/discovery-v0.1.md", "/fixtures/discovery-v0.1.json", "/source.tar.gz", "/LICENSE",
   "/robots.txt", "/sitemap.xml", "/interop.json", "/sw.js", "/manifest.webmanifest",
   "/icons/findmestill-192.png", "/icons/findmestill-512.png",
+  "/media/index.html", "/media/client.mjs", "/media/pair.mjs", "/media/format.mjs",
+  "/media/player-host.mjs", "/media/recorder.mjs", "/media/pcm-worklet.mjs", "/media/relay-client.mjs", "/media/storage.mjs",
+  "/spec/protected-media-v1.md", "/fixtures/media-pair-v1.json",
 ]);
 const contentTypes = {
   ".html": "text/html; charset=utf-8",
@@ -25,17 +29,22 @@ const contentTypes = {
   ".xml": "application/xml",
 };
 
-export function createSite(root, tls) {
+export function createSite(root, tls, { relay, playerOrigin } = {}) {
+  const frameOrigin = playerOrigin ? relayOrigin(playerOrigin) : undefined;
   const handle = async (request, response) => {
-    const pathname = request.url === "/" ? "/index.html" : request.url;
+    if (relay?.handles(request.url)) return relay.request(request, response);
+    const pathname = request.url === "/" ? "/index.html" : request.url === "/media/" ? "/media/index.html" : request.url;
     const isCard = /^\/(?:cards|contact)\/[A-Za-z0-9_~.-]+\.json$/.test(pathname);
     response.setHeader("X-Content-Type-Options", "nosniff");
     response.setHeader("Referrer-Policy", "no-referrer");
-    response.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; worker-src 'self'; manifest-src 'self'; connect-src 'self' https:; base-uri 'none'; frame-ancestors 'none'; form-action 'none'");
+    response.setHeader("Content-Security-Policy", "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; worker-src 'self'; manifest-src 'self'; connect-src 'self' https:; base-uri 'none'; frame-ancestors 'none'; form-action 'none'" + (pathname === "/media/index.html" && frameOrigin ? "; frame-src " + frameOrigin : ""));
     response.setHeader("Cache-Control", "no-store");
     if (request.method !== "HEAD" && request.method !== "GET") {
       response.writeHead(405, { Allow: "GET, HEAD" }).end();
       return;
+    }
+    if (pathname === "/media/config.json") {
+      return response.writeHead(200, { "Content-Type": "application/json" }).end(request.method === "HEAD" ? "" : JSON.stringify({ playerOrigin: frameOrigin ?? null }));
     }
     if (!isCard && !files.has(pathname)) {
       response.writeHead(404).end();
@@ -58,5 +67,13 @@ export function createSite(root, tls) {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const port = Number(process.env.PORT ?? 8080);
   if (!Number.isSafeInteger(port) || port <= 0 || port > 65535) throw new Error("Invalid port");
-  createSite(process.argv[2] ?? "dist").listen(port, "127.0.0.1");
+  let relay;
+  if (process.env.FMS_RELAY_DATABASE || process.env.FMS_RELAY_ADMISSION) {
+    const { createMediaRelay } = await import("./media-relay.mjs");
+    relay = createMediaRelay({ database: process.env.FMS_RELAY_DATABASE, admission: process.env.FMS_RELAY_ADMISSION, corsOrigins: (process.env.FMS_APP_ORIGINS ?? "").split(" ").filter(Boolean) });
+  }
+  const server = createSite(process.argv[2] ?? "dist", undefined, { relay, playerOrigin: process.env.FMS_PLAYER_ORIGIN });
+  server.requestTimeout = 30000;
+  server.once("close", () => relay?.close());
+  server.listen(port, "127.0.0.1");
 }

@@ -1,0 +1,5 @@
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; }
+body { margin: 0; padding: .65rem; }
+p { margin: .25rem 0 .5rem; }
+video, audio { display: block; width: 100%; max-height: 55vh; }
+button { padding: .45rem .85rem; margin: 0 0 .5rem; }

@@ -1,0 +1,9 @@
+{
+  "invitation": "findmestill.media-pair.v1 https://relay.example AAECAwQFBgcICQoLDA0ODw AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+  "id": "EBESExQVFhcYGRobHB0eHw",
+  "mailbox": "ZCdEgXNVoClb4Vv7ai6J2w",
+  "read": "W16Cy8Cc6iaFWYdDrZKtUCzO8KPlmiHX6yCB8zW6XkU",
+  "write": "R3JTwAPVBkAAEZ1qZwBezb972jZpYAdhmqZWyXZlJns",
+  "wire": "ARAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKiuafNf5YJzIZEJG6XGuyOsdIaxApaKh0vzj36ObuxBDz11SghkRt0fUtT8HUawvwWFxpa7E-sxDq5bbJKtN8ltcHqNuyQg8rA",
+  "plaintext": "Independently issued binary message."
+}

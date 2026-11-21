@@ -49,3 +49,49 @@ The interoperability test uses the Python issuer's published fixtures, an indepe
 This is the discovery slice. Private delivery, storage receipts, reply retrieval, operational credentials, calls and scheduling are under development. The SimpleX and Nostr/Marmot pilot will compare the delivery profiles before one is selected. Freeholder integration proceeds on its own release track.
 
 [Apache License 2.0](LICENSE).
+
+## Protected media pilot
+
+Run the app, media relay and the protected player locally using Node.js 24.
+The Linux agent also uses Bubblewrap, FFmpeg with the `asr` filter, the
+PocketSphinx English system model, and `prlimit`. The app and player use
+different names in this example.
+
+```sh
+npm run build
+install -d -m 700 .local-media
+export FMS_RELAY_ADMISSION="$(openssl rand -base64 32 | tr '/+' '_-' | tr -d '=\n')"
+FMS_RELAY_DATABASE="$PWD/.local-media/relay.sqlite" FMS_APP_ORIGINS=http://localhost:8080 \
+  FMS_PLAYER_ORIGIN=http://127.0.0.1:8081 npm start
+```
+
+In a separate terminal, run `FMS_APP_ORIGIN=http://localhost:8080 node player-server.mjs`.
+Open `http://localhost:8080/media/`, choose **Create pair** with your admission key,
+then use the pairing code in a second browser profile. Keep the code out of
+logs and share it only through a trusted channel. Send text, an uploaded media
+file, or a recorded voice note. On the other device select **Open message** and
+**Open protected player**. The browser player asks for your playback click.
+
+To authorize an agent, create a separate **Listening agent** pair. Provision it
+using standard input. The `pair` subcommand reads through EOF. From an
+interactive terminal paste the code and send EOF without saving it to shell history.
+
+```sh
+export FMS_AGENT_RELAY=http://localhost:8080
+node media-agent.mjs pair .local-media/agent.pair
+node media-agent.mjs list .local-media/agent.pair
+node media-agent.mjs listen .local-media/agent.pair MESSAGE_ID
+```
+
+Pick an agent in the person conversation's **Agent access** settings before
+sharing a clip. Automatic forwarding and the agent `watch` command each
+require opt-in. The `audio` command outputs normalized WAV for an authorized
+local consumer. The [protected media specification](public/spec/protected-media-v1.md)
+defines the wire format, trust boundary, sandbox, limits and production gates.
+
+Run the browser witness against a local Chrome and Playwright installation with
+`npm run build` and `node checks/protected-media-browser.mjs`. Set
+`FMS_PLAYWRIGHT_MODULE` to an absolute module path when Playwright is supplied
+by a separate checkout. The witness generates synthetic media with FFmpeg and
+exercises two browser profiles, sandboxed playback and a separately paired
+offline listening agent.

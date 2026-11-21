@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Private media · FindMeStill</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/media/client.mjs"></script>
+</head>
+<body>
+<header class="page site-header"><a class="brand" href="/">FindMeStill</a><span>Private media pilot</span></header>
+<main class="page media-page">
+  <h1>Private media</h1>
+  <p>Pair over a trusted channel to exchange encrypted text, voice notes and video. Keep the pairing code private.</p>
+  <details id="setup" open>
+    <summary>Pair a person or an agent</summary>
+    <form id="pair">
+      <label for="label">Conversation name</label>
+      <input id="label" maxlength="60" autocomplete="off" required>
+      <label for="purpose">Pair with</label>
+      <select id="purpose"><option value="person">Person</option><option value="agent">Listening agent</option></select>
+      <label for="admission">Relay admission key to create a pair</label>
+      <input id="admission" type="password" autocomplete="off" spellcheck="false">
+      <label for="invite">Or enter a pairing code to join</label>
+      <textarea id="invite" maxlength="360" autocomplete="off" spellcheck="false"></textarea>
+      <div class="media-actions"><button type="submit" value="create">Create pair</button><button type="submit" value="join">Join pair</button></div>
+    </form>
+    <div id="new-pair" hidden>
+      <label for="output">Pairing code</label>
+      <textarea id="output" readonly></textarea>
+      <button id="hide-code" type="button">Hide code</button>
+    </div>
+  </details>
+  <p id="media-status" role="status" aria-live="polite"></p>
+  <section id="desk" hidden>
+    <h2>Conversations</h2>
+    <label for="conversation">Conversation</label>
+    <select id="conversation"></select>
+    <form id="compose">
+      <label for="message">Text</label>
+      <textarea id="message" maxlength="16000" placeholder="Write a message"></textarea>
+      <label for="file">Or attach WAV, MP4 or WebM up to 8 MB</label>
+      <input type="file" id="file" accept=".wav,.mp4,.webm,audio/wav,video/mp4,video/webm">
+      <div class="media-actions"><button id="record" type="button">Record voice note</button><button id="discard" type="button" hidden>Discard recording</button></div>
+      <p id="recording-status" role="status"></p>
+      <div class="media-actions"><button type="submit">Send encrypted</button><button id="retry" type="button">Retry pending sends</button></div>
+    </form>
+    <fieldset id="delegate" hidden>
+      <legend>Agent access for this conversation</legend>
+      <label for="agent">Listening agent</label>
+      <select id="agent"><option value="">None</option></select>
+      <label class="media-check"><input type="checkbox" id="automatic"> Automatically share new audio and video with this agent while this conversation is open</label>
+      <p>The agent can hear the selected media. Its configured transcription service receives the audio it processes.</p>
+      <button id="save-agent" type="button">Save agent access</button>
+    </fieldset>
+    <section aria-labelledby="inbox-title">
+      <h2 id="inbox-title">Incoming messages</h2>
+      <button id="refresh" type="button">Check inbox</button>
+      <ul id="inbox"></ul>
+      <section id="opened" hidden>
+        <button id="close-message" type="button">Close message</button>
+        <p id="plain-text"></p>
+        <div class="media-actions"><button id="open-player" type="button" hidden>Open protected player</button><button id="forward" type="button" hidden>Share with selected agent</button></div>
+        <div id="player"></div>
+      </section>
+    </section>
+  </section>
+  <p><a href="/spec/protected-media-v1.md">Media and agent access specification</a></p>
+</main>
+</body>
+</html>

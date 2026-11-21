@@ -68,3 +68,16 @@ button:disabled { opacity: .6; cursor: wait; }
 .file-label { position: relative; padding: .65rem .95rem; margin: 0; color: var(--accent); border: 1px solid var(--line); border-radius: .4rem; }
 .file-label:focus-within { outline: 3px solid #acddff; outline-offset: 4px; }
 .file-label input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+.media-page { max-width: 54rem; padding-bottom: 3rem; }
+.media-page section, .media-page fieldset, .media-page details { margin-top: 1.5rem; }
+.media-page summary { cursor: pointer; font-weight: 650; }
+.media-page form, .media-page fieldset { display: grid; gap: .65rem; padding: 1rem 0; }
+.media-page input:not([type=checkbox]), .media-page textarea, .media-page select { max-width: 100%; width: 100%; font: inherit; padding: .5rem; }
+.media-page textarea { min-height: 4rem; }
+.media-page .media-actions { display: flex; flex-wrap: wrap; gap: .55rem; }
+.media-page .media-check { display: flex; align-items: first baseline; gap: .5rem; }
+.media-page #inbox { display: grid; gap: .5rem; padding-inline-start: 1.3rem; }
+.media-page #plain-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.media-page iframe { width: 100%; min-height: 24rem; border: 1px solid currentColor; }
+.media-page [hidden] { display: none !important; }
