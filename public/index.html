@@ -10,6 +10,7 @@
   <link rel="apple-touch-icon" href="/icons/findmestill-192.png">
   <link rel="stylesheet" href="/style.css">
   <title>FindMeStill — Portable contact addresses</title>
+  <script type="module" src="/publisher-ui.mjs"></script>
   <script type="module" src="/app.mjs"></script>
 </head>
 <body>
@@ -56,6 +57,42 @@
         <button class="secondary install" id="install" type="button" hidden>Install FindMeStill</button>
         <p id="status" role="status" aria-live="polite"></p>
         <ul id="saved" aria-label="Saved contacts"></ul>
+        <details id="publish">
+          <summary>Make my contact searchable</summary>
+          <p>Prepare a public block for your own website. Anyone who finds it can connect this name, ID and address.</p>
+          <form id="publish-form">
+            <label for="public-name">Public display name</label>
+            <input id="public-name" required maxlength="120" autocomplete="off">
+            <label for="my-card">My signed contact link</label>
+            <input id="my-card" type="url" required maxlength="817">
+            <label for="my-page">Public page URL</label>
+            <input id="my-page" type="url" required maxlength="768" placeholder="https://your-domain.example/fms">
+            <button type="submit" class="secondary">Prepare public block</button>
+          </form>
+          <p id="publish-status" role="status"></p>
+          <div id="publication" hidden>
+            <label for="public-text">Copy this text to your website</label>
+            <textarea id="public-text" readonly rows="5"></textarea>
+            <button id="download-page" type="button" class="secondary">Download HTML page</button>
+          </div>
+        </details>
+        <details id="book">
+          <summary>Back up or restore contacts</summary>
+          <p>Take your saved contact IDs and signed addresses to another browser or domain. Keep the recovery code separate from the downloaded file. You need both to restore.</p>
+          <button class="secondary" id="export-book" type="button">Download encrypted contact book</button>
+          <div id="export-code" hidden>
+            <label for="book-code">Recovery code for this download</label>
+            <input id="book-code" readonly autocomplete="off" spellcheck="false">
+            <button class="secondary" id="hide-code" type="button">Hide code</button>
+          </div>
+          <form id="restore-book">
+            <label for="book-file">Contact book file</label>
+            <input id="book-file" type="file" accept=".fmsbook,application/octet-stream" required>
+            <label for="recovery-code">Recovery code</label>
+            <input id="recovery-code" type="password" autocomplete="off" spellcheck="false" maxlength="52" required>
+            <button type="submit">Restore contacts</button>
+          </form>
+        </details>
       </div>
     </section>
     <section class="resources" aria-labelledby="resources-title">
@@ -66,6 +103,8 @@
       <ul>
         <li><a href="/spec/discovery-v0.1.md">Discovery specification</a></li>
         <li><a href="/fixtures/discovery-v0.1.json">Signed test vectors</a></li>
+        <li><a href="/spec/contact-book-v1.md">Contact book recovery and security</a></li>
+        <li><a href="/spec/searchable-page.md">Publish a searchable contact page</a></li>
         <li><a href="/interop.json">Compatibility results</a></li>
         <li><a href="/source.tar.gz">Reference server and client source</a></li>
       </ul>

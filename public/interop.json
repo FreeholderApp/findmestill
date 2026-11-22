@@ -2,7 +2,12 @@
   "profile": "findmestill-card-v0.1",
   "evidence": "Reproducible local conformance test over TLS with a disposable test certificate",
   "command": "npm test",
-  "implementations": ["Python Ed25519 issuer", "Node reference card host", "Python static backup host", "Node Web Crypto verifier"],
+  "implementations": [
+    "Python Ed25519 issuer",
+    "Node reference card host",
+    "Python static backup host",
+    "Node Web Crypto verifier"
+  ],
   "verified": [
     "Discover a Python-issued card over HTTPS",
     "Resolve the same contact ID to a new primary through a saved backup after stopping the old host",
@@ -10,5 +15,16 @@
     "Keep the current pin when a replica is stale",
     "Reject conflicting signatures, expiry, skipped revisions, substitute roots and malformed documents"
   ],
-  "fixture": "/fixtures/discovery-v0.1.json"
+  "fixture": "/fixtures/discovery-v0.1.json",
+  "additionalFixture": "/fixtures/discovery-predecessor-v0.1.json",
+  "checks": {
+    "discoveryRecovery": "node checks/discovery-recovery-browser.mjs",
+    "requires": "Build dist first, then use local Playwright with the Chrome channel and disposable loopback origins.",
+    "exercises": [
+      "Two independent contacts lose their original primary domains and restore their encrypted books offline on a fresh app origin.",
+      "One uses a signed backup. The other checks a public HTML lead against the saved identity.",
+      "Browser and CLI emit identical public HTML and display the full contact ID as ordinary text.",
+      "Concurrent browser tabs serialize updates. Evicted public shell files retain their integrity checks."
+    ]
+  }
 }

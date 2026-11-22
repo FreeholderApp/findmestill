@@ -42,7 +42,7 @@ p { color: var(--muted); line-height: 1.65; }
 .flow-caption { margin-top: .8rem; }
 .workspace, .resources { border-top: 1px solid var(--line); padding-block: clamp(2rem, 6vw, 4rem); align-items: start; grid-template-columns: minmax(0, 1fr) minmax(16rem, 1.45fr); }
 label { display: block; font-weight: 650; margin-bottom: .45rem; }
-input { width: 100%; padding: .75rem; border: 1px solid var(--line); background: var(--background); border-radius: .36rem; font: inherit; color: var(--ink); }
+input, textarea { width: 100%; padding: .75rem; border: 1px solid var(--line); background: var(--background); border-radius: .36rem; font: inherit; color: var(--ink); }
 input::placeholder { color: var(--muted); }
 .actions { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: .8rem; }
 button.secondary { background: transparent; color: var(--accent); border-color: var(--line); }
@@ -68,3 +68,13 @@ button:disabled { opacity: .6; cursor: wait; }
 .file-label { position: relative; padding: .65rem .95rem; margin: 0; color: var(--accent); border: 1px solid var(--line); border-radius: .4rem; }
 .file-label:focus-within { outline: 3px solid #acddff; outline-offset: 4px; }
 .file-label input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+
+#saved details { margin-top: .75rem; }
+#saved summary { cursor: pointer; color: var(--accent); }
+#saved details input { margin-top: .5rem; }
+
+#book, #publish { border-top: 1px solid var(--line); margin-top: 1rem; padding-top: .75rem; }
+#book summary, #publish summary { color: var(--accent); cursor: pointer; }
+#book p, #book form, #book label, #book button, #publish p, #publish label, #publish button { margin-top: .75rem; }
+
+#saved details label { margin-top: .75rem; }

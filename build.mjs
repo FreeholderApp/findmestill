@@ -17,7 +17,7 @@ if (clean) execFileSync("git", ["archive", "--format=tar.gz", "--prefix=findmest
 await writeFile("dist/release.json", JSON.stringify({ revision: clean ? revision : null, discovery: "0.1" }) + "\n");
 
 const shellFiles = [
-  "/index.html", "/style.css", "/app.mjs", "/discovery.mjs",
+  "/index.html", "/style.css", "/app.mjs", "/discovery.mjs", "/contact-book.mjs", "/publish-page.mjs", "/publisher-ui.mjs",
   "/manifest.webmanifest", "/icons/findmestill-192.png", "/icons/findmestill-512.png",
   "/fixtures/discovery-v0.1.json",
 ];

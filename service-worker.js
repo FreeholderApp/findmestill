@@ -26,8 +26,11 @@ self.addEventListener("fetch", event => {
   const url = new URL(request.url);
   if (request.method !== "GET" || url.origin !== self.location.origin || url.search
     || !Object.hasOwn(shellAssets, url.pathname)) return;
+  if (request.headers.has("Authorization") || request.headers.has("Range")) return;
   event.respondWith((async () => {
     const cached = await (await caches.open(cacheName)).match(url.pathname);
-    return cached ?? fetch(request);
+    return cached ?? fetch(new Request(url.href, {
+      integrity: shellAssets[url.pathname], credentials: "omit", redirect: "error", cache: "no-store",
+    }));
   })());
 });

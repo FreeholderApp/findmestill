@@ -1,8 +1,25 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
-import { readFile, writeFile } from "node:fs/promises";
-import { maxRecords, profile, resolveContact, selectCard } from "./public/discovery.mjs";
+import { open, readFile, writeFile } from "node:fs/promises";
+import { checkContact, maxDocumentBytes, maxRecords, profile, resolveContact, selectCard } from "./public/discovery.mjs";
+
+import { publishPage } from "./public/publish-page.mjs";
+
+async function readDocument(path) {
+  const file = await open(path, "r");
+  try {
+    const bytes = Buffer.alloc(maxDocumentBytes + 1);
+    let size = 0;
+    while (size <= maxDocumentBytes) {
+      const { bytesRead } = await file.read(bytes, size, bytes.length - size);
+      if (!bytesRead) break;
+      size += bytesRead;
+    }
+    if (size > maxDocumentBytes) throw Error("Document exceeds the discovery byte limit");
+    return JSON.parse(new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes.subarray(0, size)));
+  } finally { await file.close(); }
+}
 
 const hash = input => createHash("sha256").update(input).digest("base64url");
 const encode = value => Buffer.from(JSON.stringify(value)).toString("base64url");
@@ -17,7 +34,7 @@ async function issue([rootPath, primary, duration, priorPath, ...backups]) {
   const { x } = createPublicKey(privateKey).export({ format: "jwk" });
   const id = `fms1-${hash(JSON.stringify({ crv: "Ed25519", kty: "OKP", x }))}`;
   const now = Math.floor(Date.now() / 1000);
-  const prior = priorPath === "-" ? [] : JSON.parse(await readFile(priorPath, "utf8"));
+  const prior = priorPath === "-" ? [] : await readDocument(priorPath);
   if (!Array.isArray(prior) || prior.length >= maxRecords || (priorPath !== "-" && prior.length === 0)) {
     throw new Error("Invalid prior document");
   }
@@ -44,19 +61,26 @@ try {
     const [id, document, when] = args;
     const now = when === undefined ? undefined : Number(when);
     if (now !== undefined && (!Number.isSafeInteger(now) || now <= 0)) throw new Error("Invalid clock");
-    output(await selectCard(id, [JSON.parse(await readFile(document, "utf8"))], { now }));
+    output(await selectCard(id, [await readDocument(document)], { now }));
+  } else if (command === "publish-page" && (args.length === 3 || args.length === 4)) {
+    const [pageUrl, id, file, label] = args;
+    const { html } = await publishPage(pageUrl, id, await readDocument(file), label);
+    process.stdout.write(html);
   } else if (command === "resolve" && args.length === 1) {
     const [locator, id, extra] = args[0].split("#");
     if (extra !== undefined) throw new Error("Expected a single contact ID fragment");
     output(await resolveContact({ id, locator }));
   } else if (command === "refresh" && args.length === 1) {
-    const { id, jws } = JSON.parse(await readFile(args[0], "utf8"));
-    output(await resolveContact({ id, pin: jws }));
+    const { id, jws } = await readDocument(args[0]);
+    const { card, confirmed } = await checkContact({ id, pin: jws });
+    if (!confirmed) console.error("Using the saved card. No host confirmed its revision.");
+    output(card);
   } else {
     throw new Error([
       "node client.mjs keygen ROOT.pem",
       "node client.mjs issue ROOT.pem PRIMARY TTL_SECONDS PRIOR.json|- [BACKUP ...]",
       "node client.mjs verify CONTACT_ID DOCUMENT.json [UTC_SECONDS]",
+      "node client.mjs publish-page PAGE_URL CONTACT_ID DOCUMENT.json [PUBLIC_NAME]",
       "node client.mjs resolve 'https://host/path#fms1-ID'",
       "node client.mjs refresh SAVED_CARD.json",
     ].join("\n"));
