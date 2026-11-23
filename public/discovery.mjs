@@ -38,14 +38,15 @@ async function sha256(text) {
 }
 
 export function validateContactId(id) {
-  need(typeof id === "string" && id.startsWith("fms1-") && decode(id.slice(5), 43).length === 32, "invalid_id");
+  need(typeof id === "string" && /^fms1-[A-Za-z0-9_-]{42}[AEIMQUYcgkosw048]$/.test(id) && id.length === 48, "invalid_id");
   return id;
 }
 
 export function validateLocator(value) {
   need(typeof value === "string" && value.length <= 768
     && /^https:\/\/[a-z0-9.-]+(?::[0-9]+)?\/[a-zA-Z0-9_~./-]*$/.test(value), "invalid_locator");
-  const url = URL.parse(value);
+  let url;
+  try { url = new URL(value); } catch { throw new DiscoveryError("invalid_locator"); }
   need(url && url.href === value && url.port !== "0"
     && /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(url.hostname)
     && url.hostname.length <= 253
@@ -78,6 +79,7 @@ function parsePayload(bytes) {
 }
 
 export async function verifyCard(jws, expectedId, now = Math.floor(Date.now() / 1000)) {
+  need(Number.isSafeInteger(now) && now >= 0, "invalid_clock");
   validateContactId(expectedId);
   need(typeof jws === "string" && jws.length <= 4090);
   const parts = jws.split(".");
@@ -112,12 +114,13 @@ async function verifyChain(records, id, now) {
 }
 
 // A pin is the exact compact JWS previously selected and persisted by the client.
-export async function selectCard(id, documents, { pin, now = Math.floor(Date.now() / 1000) } = {}) {
+async function selectWithEvidence(id, documents, pinned, now) {
   validateContactId(id);
-  const pinned = pin === undefined ? undefined : await verifyCard(pin, id, now);
   const results = await Promise.allSettled(documents.map(records => verifyChain(records, id, now)));
   const seen = new Map(pinned ? [[pinned.revision, pinned.digest]] : []);
+  if (pinned?.previous) seen.set(pinned.revision - 1, pinned.previous);
   let head = pinned;
+  let highestPublished = 0;
   for (const result of results) {
     if (result.status === "rejected") continue;
     for (const card of result.value) {
@@ -125,11 +128,17 @@ export async function selectCard(id, documents, { pin, now = Math.floor(Date.now
       seen.set(card.revision, card.digest);
     }
     const candidate = result.value.at(-1);
+    highestPublished = Math.max(highestPublished, candidate.revision);
     if (!head || candidate.revision > head.revision) head = candidate;
   }
   need(head, "no_verified_card");
   need(head.expiresAt > now, "expired_card");
-  return head;
+  return { card: head, confirmed: highestPublished === head.revision };
+}
+
+export async function selectCard(id, documents, { pin, now = Math.floor(Date.now() / 1000) } = {}) {
+  const pinned = pin === undefined ? undefined : await verifyCard(pin, id, now);
+  return (await selectWithEvidence(id, documents, pinned, now)).card;
 }
 
 export async function readCardDocument(locator, fetcher = fetch) {
@@ -166,11 +175,20 @@ export async function readCardDocument(locator, fetcher = fetch) {
   return JSON.parse(decoder.decode(bytes));
 }
 
-export async function resolveContact({ id, locator, pin, fetcher = fetch, now = Math.floor(Date.now() / 1000) }) {
+export async function checkContact({ id, locator, pin, fetcher = fetch, now }) {
   validateContactId(id);
-  const saved = pin === undefined ? undefined : await verifyCard(pin, id, now);
+  const clock = () => now ?? Math.floor(Date.now() / 1000);
+  const saved = pin === undefined ? undefined : await verifyCard(pin, id, clock());
   const locators = saved ? [saved.primary, ...saved.backups] : [validateLocator(locator)];
-  const responses = await Promise.allSettled(locators.map(url => readCardDocument(url, fetcher)));
+  // A caller may supply a fresh, explicit introduction for a saved contact.
+  if (saved && locator !== undefined) locators.push(validateLocator(locator));
+  const responses = await Promise.allSettled([...new Set(locators)].map(url => readCardDocument(url, fetcher)));
   const documents = responses.filter(result => result.status === "fulfilled").map(result => result.value);
-  return selectCard(id, documents, { pin, now });
+  const result = await selectWithEvidence(id, documents, saved, clock());
+  need(result.card.expiresAt > clock(), "expired_card");
+  return result;
+}
+
+export async function resolveContact(options) {
+  return (await checkContact(options)).card;
 }

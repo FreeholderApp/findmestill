@@ -58,5 +58,10 @@ if __name__ == "__main__":
                    moved=[genesis, moved], conflict=[genesis, forked], skipped=[genesis, skipped],
                    forged=[genesis, forged], wrongKey=[genesis, wrong_key],
                    future=[genesis, future], expired=[genesis, expired])
+    if sys.argv[1:] == ["--predecessor"]:
+        _, third = issue(root, 3, moved, NOW + 61, NOW + 1200, MOVED, [BACKUP])
+        vectors = dict(contactId=contact_id, now=NOW + 61, pin=third,
+                       current=[genesis, moved, third], predecessor=[genesis, moved],
+                       conflicting=[genesis, forked], expiredConflict=[genesis, expired])
     json.dump(vectors, sys.stdout, indent=2)
     print()
